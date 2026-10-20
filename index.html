@@ -1,0 +1,104 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Our Daily Moments</title>
+<style>
+:root{--bg1:#fde7ef;--bg2:#e9e2fb;--card:rgba(255,255,255,.74);--ink:#3b2a40;--mut:#8b7390;--pk:#e8739a;--lv:#9b86d6;--line:rgba(155,134,214,.28);--chip:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg1:#2a1b2e;--bg2:#1f1a33;--card:rgba(60,42,70,.62);--ink:#f6e9f1;--mut:#c4aacb;--line:rgba(200,170,230,.28);--chip:rgba(255,255,255,.08)}}
+:root[data-theme="dark"]{--bg1:#2a1b2e;--bg2:#1f1a33;--card:rgba(60,42,70,.62);--ink:#f6e9f1;--mut:#c4aacb;--line:rgba(200,170,230,.28);--chip:rgba(255,255,255,.08)}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100vh;font-family:Georgia,'Segoe UI',system-ui,sans-serif;color:var(--ink);background:linear-gradient(160deg,var(--bg1),var(--bg2)) fixed}
+main{max-width:560px;margin:0 auto;padding:16px 14px 90px}
+h1{font-size:1.55rem;margin:.2rem 0;text-align:center}.sub{text-align:center;color:var(--mut);margin:0 0 12px;font-size:.95rem}
+.heart{display:inline-block;color:var(--pk);animation:beat 1.6s infinite}@keyframes beat{50%{transform:scale(1.18)}}
+.card{background:var(--card);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:20px;padding:16px;margin:12px 0;box-shadow:0 6px 20px rgba(155,134,214,.12);animation:up .4s ease both}
+@keyframes up{from{opacity:0;transform:translateY(8px)}}
+h2{font-size:1.05rem;margin:0 0 10px;color:var(--pk)}label,.q{display:block;font-size:.88rem;color:var(--mut);margin:10px 0 6px;font-family:system-ui,sans-serif}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--line);background:var(--chip);color:var(--ink);padding:9px 13px;border-radius:999px;font:inherit;font-size:.9rem;cursor:pointer;transition:.18s;font-family:system-ui,sans-serif}
+.chip.on{background:linear-gradient(135deg,var(--pk),var(--lv));color:#fff;border-color:transparent;transform:scale(1.04)}
+.big{flex:1 1 30%;text-align:center;padding:12px 6px}
+input,select,textarea{width:100%;padding:11px 12px;border-radius:14px;border:1.5px solid var(--line);background:var(--chip);color:var(--ink);font:inherit;font-size:.95rem;font-family:system-ui,sans-serif}
+textarea{min-height:70px;resize:vertical}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{width:100%;border:0;border-radius:16px;padding:14px;font-size:1rem;color:#fff;background:linear-gradient(135deg,var(--pk),var(--lv));cursor:pointer;margin-top:10px;font-family:system-ui,sans-serif}
+.btn.alt{background:var(--chip);color:var(--ink);border:1.5px solid var(--line)}
+.tabs{display:flex;gap:8px;margin:8px 0}.tabs .chip{flex:1;text-align:center}
+.cnt{font-size:1.05rem;text-align:center;margin:8px 0;color:var(--lv);font-weight:600}.soft{color:var(--mut);font-size:.88rem;text-align:center;font-family:system-ui,sans-serif}
+.sum div{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:.92rem;font-family:system-ui,sans-serif}.sum span:first-child{color:var(--mut)}.sum span:last-child{text-align:right}
+.note{border-left:3px solid var(--pk);padding:8px 12px;background:var(--chip);border-radius:10px;margin:10px 0;font-size:.88rem;font-family:system-ui,sans-serif}
+.hist{display:flex;justify-content:space-between;padding:12px;border-radius:14px;background:var(--chip);margin:8px 0;cursor:pointer;font-family:system-ui,sans-serif}
+@media print{body{background:#fff;color:#000}.noprint{display:none!important}.card{box-shadow:none;backdrop-filter:none}}
+</style></head><body><main id="app"></main>
+<script>
+// ---- CONFIG: leave empty for no-backend mode. Fill in after Supabase setup (see README). ----
+const CFG={url:"",anon:"",wa:(location.hash.match(/wa=(\d+)/)||[])[1]||""};
+const P=["Fajr","Dhuhr","Asr","Maghrib","Isha"];
+const ACTS=["Studied / Worked","Spent time with family","Household tasks","Read a book","Exercised or walked","Relaxed","Other"];
+const MOODS=["😊 Very Happy","🙂 Good","😐 Normal","😔 A Little Sad","😣 Stressed or Tired"];
+const iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const KEY=(location.hash.match(/k=([^&]+)/)||[])[1]||"";
+const ADMIN=/admin/.test(location.hash);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const blank=d=>({date:d,sleep:"",wake:"",meals:{b:{},l:{},d:{}},water:"",snack:"",glasses:"",hygiene:"",activity:"",rest:"",mood:"",health:"",disc:"",hnote:"",prayers:[],acts:[],notes:"",day:"",smile:"",tell:"",priv:""});
+let r=blank(iso(new Date())),view="form",msg="",admin={tok:"",rows:null,pick:null};
+const ls={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}};
+const saved=()=>ls.get("odm")||{};
+function load(d){const s=saved()[d];r=s?{...blank(d),...s.data}:blank(d);r.date=d}
+load(r.date);
+function sleepHrs(){if(!r.sleep||!r.wake)return null;const[a,b]=r.sleep.split(":").map(Number),[c,e]=r.wake.split(":").map(Number);let m=(c*60+e)-(a*60+b);if(m<=0)m+=1440;return Math.round(m/6)/10}
+const rotis=()=>["b","l","d"].reduce((n,k)=>n+(r.meals[k].rot==="5+"?5:+r.meals[k].rot||0),0);
+const setP=(p,v)=>{const a=p.split(".");let o=r;while(a.length>1)o=o[a.shift()];o[a[0]]=v};
+const getP=p=>p.split(".").reduce((o,k)=>o?.[k],r);
+function chip(p,v,l,cls=""){const on=getP(p)===v;return `<button type="button" class="chip ${cls} ${on?"on":""}" data-s="${p}" data-v="${esc(v)}">${esc(l??v)}</button>`}
+const chips=(p,vs,cls)=>`<div class="row">${vs.map(v=>chip(p,v,v,cls)).join("")}</div>`;
+const multi=(p,vs)=>`<div class="row">${vs.map(v=>`<button type="button" class="chip ${r[p].includes(v)?"on":""}" data-m="${p}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>`;
+const ta=(p,l,ph="")=>`<label>${l}</label><textarea data-t="${p}" placeholder="${ph}">${esc(getP(p))}</textarea>`;
+function meal(k,n){const m=r.meals[k];return `<section class="card"><h2>${n}</h2><div class="row">${chip(`meals.${k}.ate`,"Yes","Yes, I ate")}${chip(`meals.${k}.ate`,"No","No")}</div>
+${m.ate==="Yes"?`<label>How many rotis?</label>${chips(`meals.${k}.rot`,["0","1","2","3","4","5+"])}<label>Anything else you ate (optional)</label><input data-t="meals.${k}.note" value="${esc(m.note)}" placeholder="Rice, curry, fruit…">`:""}</section>`}
+function formView(){const h=sleepHrs(),n=r.prayers.length,left=P.filter(p=>!r.prayers.includes(p));
+return `<h1>A Little Update About Your Day <span class="heart">❤️</span></h1><p class="sub">Takes about 2–3 minutes. Everything is optional.</p>
+<section class="card"><h2>Which day?</h2><input type="date" id="dt" value="${r.date}" max="${iso(new Date())}"><p class="soft" id="exist">${saved()[r.date]?"A report for this date already exists on this phone — you are editing it.":""}</p></section>
+<section class="card"><h2>Sleep 🌙</h2><div class="two"><div><label>Went to sleep</label><input type="time" data-t="sleep" value="${r.sleep}"></div><div><label>Woke up</label><input type="time" data-t="wake" value="${r.wake}"></div></div><div class="cnt" id="sh">${h!=null?`About ${h} hours of sleep`:""}</div></section>
+${meal("b","Breakfast 🍳")}${meal("l","Lunch 🍛")}${meal("d","Dinner 🍽️")}
+<section class="card"><h2>Water &amp; Snacks 💧</h2><label>Glasses of water today</label>${chips("water",["1–3","4–6","7–8","9+"])}<label>Snacks</label>${chips("snack",["No snacks","Light snacks","Multiple snacks"])}</section>
+<section class="card"><h2>Care 🌸</h2><label>Did you wear your glasses?</label>${chips("glasses",["Yes","No","Not applicable"])}<label>Personal hygiene</label>${chips("hygiene",["Yes","No","Prefer not to answer"])}<label>Physical activity</label>${chips("activity",["Yes","No"])}<label>Enough rest</label>${chips("rest",["Yes","No"])}</section>
+<section class="card"><h2>Mood &amp; Health 💗</h2><label>How did you feel?</label>${chips("mood",MOODS)}<label>Health</label>${chips("health",["Excellent","Good","Okay","Not Feeling Well"])}<label>Any discomfort today?</label>${chips("disc",["No","Yes, a little"])}${ta("hnote","Want to share about your health or mood?")}</section>
+<section class="card"><h2>Prayers 🤲</h2><div class="row">${P.map(p=>`<button type="button" class="chip big ${r.prayers.includes(p)?"on":""}" data-m="prayers" data-v="${p}">${p}</button>`).join("")}</div><div class="cnt">${n} out of 5 prayers completed</div><p class="soft">${n==5?"May it be accepted. 🤍":left.length?`Still ahead: ${left.join(", ")}`:""}</p></section>
+<section class="card"><h2>Today I… ✨</h2>${multi("acts",ACTS)}</section>
+<section class="card"><h2>A Little Message for You ❤️</h2>${ta("day","How was your day overall?")}${ta("smile","What made you smile today?")}${ta("tell","Anything you want to tell me?")}${ta("priv","Private message for my husband (optional)")}${ta("notes","Other notes (optional)")}</section>
+<button class="btn" data-a="sum">See my day ❤️</button>`}
+function rows(x){const R=x.meals;const ml=k=>R[k].ate==="Yes"?`Ate${R[k].rot?`, ${R[k].rot} roti`:""}${R[k].note?` (${R[k].note})`:""}`:R[k].ate==="No"?"Skipped":"—";
+const d=x===r?sleepHrs():(()=>{const bak=r;r=x;const v=sleepHrs();r=bak;return v})();
+const tot=(()=>{const bak=r;r=x;const v=rotis();r=bak;return v})();
+return [["Date",new Date(x.date+"T00:00").toDateString()],["Sleep",x.sleep?`${x.sleep} → ${x.wake||"?"}${d?` (≈${d} h)`:""}`:"—"],["Breakfast",ml("b")],["Lunch",ml("l")],["Dinner",ml("d")],["Total rotis",tot],["Water",x.water?x.water+" glasses":"—"],["Snacks",x.snack||"—"],["Glasses",x.glasses||"—"],["Hygiene",x.hygiene||"—"],["Activity / Rest",`${x.activity||"—"} / ${x.rest||"—"}`],["Mood",x.mood||"—"],["Health",`${x.health||"—"}${x.disc?` · discomfort: ${x.disc}`:""}`],["Prayers",`${x.prayers.length}/5${x.prayers.length?` (${x.prayers.join(", ")})`:""}`],["Activities",x.acts.join(", ")||"—"],["Health/mood note",x.hnote],["Overall day",x.day],["Made me smile",x.smile],["To tell you",x.tell],["Private message",x.priv],["Notes",x.notes]].filter(a=>a[1]!==""&&a[1]!=null)}
+const asText=x=>"Our Daily Moments ❤️\n"+rows(x).map(a=>`${a[0]}: ${a[1]}`).join("\n");
+const sumCard=x=>`<section class="card sum">${rows(x).map(a=>`<div><span>${esc(a[0])}</span><span>${esc(a[1])}</span></div>`).join("")}</section>`;
+function sumView(){return `<h1>Your Day, Beautifully Told <span class="heart">❤️</span></h1>${sumCard(r)}<div class="noprint"><button class="btn alt" data-a="edit">Edit Answers</button><button class="btn" data-a="submit">Submit My Day</button><button class="btn alt" data-a="copy">Save a Copy / Print Report</button></div>`}
+function doneView(){return `<h1>${msg.ok?"Your day has been saved":"Almost there"} <span class="heart">❤️</span></h1><section class="card"><p style="margin:0">${msg.ok?"Thank you for sharing your little moments with me.":""}</p><div class="note">${esc(msg.text)}</div></section>${true?`<a class="btn" style="display:block;text-align:center;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${CFG.wa}?text=${encodeURIComponent(asText(r))}">Send to my husband on WhatsApp 💬</a><p class="soft">WhatsApp opens with the full report ready. Tap the send arrow to deliver it.</p>`:""}<button class="btn alt noprint" data-a="print">Save as PDF / Print</button><button class="btn alt noprint" data-a="edit">Back to my report</button>`}
+function histView(){const s=saved(),ks=Object.keys(s).sort().reverse();return `<h1>Past Days</h1><p class="sub">Saved on this phone</p>${ks.length?ks.map(k=>`<div class="hist" data-open="${k}"><span>${new Date(k+"T00:00").toDateString()}</span><span>${s[k].data.prayers.length}/5 🤲 · ${esc((s[k].data.mood||"").slice(0,2))} ${s[k].sent?"✅ sent":"📱 not sent"}</span></div>`).join(""):`<section class="card soft">No reports yet. Your first one will show up here.</section>`}`}
+function adminView(){if(!CFG.url)return `<h1>Husband Dashboard</h1><section class="card soft">Connect Supabase (see README) to receive reports here. Until then, reports arrive through WhatsApp.</section>`;
+if(!admin.tok)return `<h1>Husband Dashboard 🔒</h1><section class="card"><label>Email</label><input id="em" type="email" autocomplete="username"><label>Password</label><input id="pw" type="password" autocomplete="current-password"><button class="btn" data-a="login">Sign in</button><p class="soft">${esc(msg.text||"")}</p></section>`;
+if(!admin.rows)return `<h1>Loading…</h1>`;const rs=admin.rows;
+if(admin.pick){const x=rs.find(q=>q.report_date===admin.pick);return `<button class="btn alt noprint" data-a="back">← All days</button>${x?sumCard({...blank(x.report_date),...x.data}):`<section class="card soft">No report for this date.</section>`}<button class="btn alt noprint" data-a="print">Print / Save PDF</button>`}
+return `<h1>Her Days ❤️</h1><p class="sub">Newest first</p>${rs.length?rs.map(q=>`<div class="hist" data-pick="${q.report_date}"><span>${new Date(q.report_date+"T00:00").toDateString()}</span><span>${(q.data.prayers||[]).length}/5 🤲 ${esc((q.data.mood||"").slice(0,2))}</span></div>`).join(""):`<section class="card soft">No reports yet.</section>`}<label>Look up a date</label><input type="date" id="adt">`}
+function render(){const top=ADMIN?"":`<div class="tabs noprint">${["form","history"].map(v=>`<button class="chip ${view===v||(v==="form"&&["summary","done"].includes(view))?"on":""}" data-v2="${v}">${v==="form"?"Today":"History"}</button>`).join("")}</div>`;
+const body=ADMIN?adminView():{form:formView,summary:sumView,done:doneView,history:histView}[view]();document.getElementById("app").innerHTML=top+body}
+async function submit(){const stamp=new Date().toISOString();const all=saved();
+const keep=sent=>{all[r.date]={data:r,at:stamp,sent};ls.set("odm",all)};
+if(!CFG.url){keep(false);msg={ok:false,share:true,text:"Nothing has been delivered yet. This site isn't connected to a server, so your report is only saved on this phone. Tap WhatsApp below to actually send it."};view="done";return render()}
+try{const res=await fetch(CFG.url+"/rest/v1/rpc/submit_report",{method:"POST",headers:{apikey:CFG.anon,"Content-Type":"application/json"},body:JSON.stringify({p_key:KEY,p_date:r.date,p_data:r})});if(!res.ok)throw new Error(res.status);keep(true);msg={ok:true,text:"Delivered. Re-submitting for the same date updates that day's report."}}
+catch(e){keep(false);msg={ok:false,share:true,text:"It could not be delivered (no connection, or the link is missing its key). It is saved on this phone, and you can send it via WhatsApp instead."}}
+view="done";render()}
+async function loadAdmin(){try{const q=await fetch(CFG.url+"/rest/v1/reports?select=report_date,data&order=report_date.desc",{headers:{apikey:CFG.anon,Authorization:"Bearer "+admin.tok}});if(!q.ok)throw 0;admin.rows=await q.json()}catch(e){admin.tok="";msg={text:"Could not load. Sign in again."}}render()}
+const app=document.getElementById("app");
+app.addEventListener("click",async e=>{const t=e.target.closest("button,[data-open],[data-pick]");if(!t)return;
+if(t.dataset.s){const v=t.dataset.v;setP(t.dataset.s,getP(t.dataset.s)===v?"":v);return render()}
+if(t.dataset.m){const a=r[t.dataset.m],v=t.dataset.v,i=a.indexOf(v);i>=0?a.splice(i,1):a.push(v);return render()}
+if(t.dataset.v2){view=t.dataset.v2;return render()}
+if(t.dataset.open){load(t.dataset.open);view="form";return render()}
+if(t.dataset.pick){admin.pick=t.dataset.pick;return render()}
+const a=t.dataset.a;if(a==="sum"){view="summary"}else if(a==="edit"||a==="back"){view="form";admin.pick=null}else if(a==="submit")return submit();
+else if(a==="print"||a==="copy"){try{window.print()}catch(x){}try{await navigator.clipboard.writeText(asText(r))}catch(x){}return}
+else if(a==="login"){try{const q=await fetch(CFG.url+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:CFG.anon,"Content-Type":"application/json"},body:JSON.stringify({email:document.getElementById("em").value,password:document.getElementById("pw").value})});const j=await q.json();if(!j.access_token)throw 0;admin.tok=j.access_token;render();return loadAdmin()}catch(x){msg={text:"Wrong email or password."}}}
+render();scrollTo({top:0,behavior:"smooth"})});
+app.addEventListener("input",e=>{const t=e.target;if(t.dataset.t){setP(t.dataset.t,t.value);if(t.dataset.t==="sleep"||t.dataset.t==="wake"){const h=sleepHrs();document.getElementById("sh").textContent=h!=null?`About ${h} hours of sleep`:""}}});
+app.addEventListener("change",e=>{if(e.target.id==="dt"&&e.target.value){load(e.target.value);render()}if(e.target.id==="adt"){admin.pick=e.target.value;render()}});
+render();
+</script></body></html>
